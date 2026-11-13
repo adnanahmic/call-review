@@ -1,67 +1,91 @@
 # Call Summary QA Review
 
-**Live:** https://call-review-gold.vercel.app
+**Try it live:** https://call-review-gold.vercel.app
 
-Helps a QA reviewer decide whether a collections-call summary matches its transcript and follows the summary rules.
-The AI checks each claim in the summary, flags omissions and rule breaches, and cites the transcript turns behind every finding.
-The reviewer follows the evidence and records a decision. All 20 calls are synthetic (`instructions/`).
+When a call is summarised, someone has to check that the summary actually matches what was said. This tool helps with that. It reads the summary claim by claim, compares each claim with the transcript, and points to the exact lines it's basing its view on. You look at the evidence and make the call.
 
-## Run it
+All 20 calls are made up for this exercise. You'll find them in `instructions/`.
 
-Requires Node 22 and pnpm 9+.
+## Running it on your machine
+
+You'll need Node 22 and pnpm 9 or newer.
 
 ```bash
 pnpm install
-cp .env.example .env.local   # add ANTHROPIC_API_KEY (ANTHROPIC_MODEL optional, default claude-sonnet-5-5)
-pnpm dev                     # http://localhost:3000
+cp .env.example .env.local
 ```
 
-Without a key, the app still runs: the automatic rule checks work and the AI panel shows a clear error.
-
-## Check it
+Open `.env.local` and paste in your Anthropic API key. Then start the app:
 
 ```bash
-pnpm verify      # format, lint, typecheck, 91 unit/component tests (AI mocked), build
-pnpm test:e2e    # Playwright happy path; add E2E_BASE_URL=<url> to run against prod
-pnpm eval        # accuracy against my labels for all 20 calls (20 real AI calls)
+pnpm dev
 ```
 
-To check it by hand, open **CALL-003** and click **Run AI review**. You should see the consent claim marked Contradicted (citing T10), the "no money for food" omission (T08), and the £460 arrears breach. Click a turn chip to jump to it, then save a decision and reload to see it persist. **CALL-005** is an accurate summary and should get no definite findings.
+Go to http://localhost:3000 and you're in.
 
-## What I prioritised and why
+No API key? The app still opens and the basic rule checks still work. You just won't get the AI review, and the app tells you why.
 
-1. **Evidence the reviewer can trust.** Every AI citation is re-checked against the real transcript turn. Fabricated or ambiguous quotes are thrown out, and verdicts left without evidence are downgraded to "uncertain". A reviewer can only rely on findings they can verify.
-2. **Separating "definitely wrong" from "not sure".** Claims are marked supported, contradicted, not in transcript, or uncertain, and issues are definite or possible. The task asked for this, and it decides where the reviewer spends time.
-3. **A deployed core flow before extras.** Review, evidence, decision, and loading/empty/error states all work in production. There's no upload, dashboard or login.
-4. **Measuring accuracy rather than assuming it.** I wrote my own answer key for all 20 calls and built an eval against it.
+## Checking that it works
 
-## Material assumptions
+The quickest way is to try it yourself:
 
-- The 20 supplied calls are the whole dataset; there's no upload of new pairs.
-- The AI suggests and the reviewer decides. Decisions are saved in the reviewer's browser, since there's no database or login.
-- The API accepts only a call ID; the transcript and summary always come from the server.
-- Where the task pack is specific, it overrides the general rules: the DPA "no DPA stated with agent" exception, keeping named advice bodies, and using the call date for relative dates.
+1. Open **CALL-003** and click **Run AI review**. It takes about 10 seconds.
+2. You should see it catch three problems:
+   - The summary says consent was given, but the customer refused (turn T10).
+   - It leaves out that the customer had no money for food (T08).
+   - It states the arrears amount (£460), which the rules don't allow.
+3. Click any turn number, like **T10**. The transcript jumps to that line.
+4. Pick a decision, save it, and refresh the page. Your decision should still be there.
+5. Now open **CALL-005**. That summary is accurate, so nothing serious should be flagged.
+
+If you'd rather run the automated checks:
+
+```bash
+pnpm verify     # formatting, linting, type checks, 91 tests and a build
+pnpm test:e2e   # clicks through the app in a real browser
+pnpm eval       # measures the AI against my own answers for all 20 calls
+```
+
+`pnpm eval` uses your API key and makes 20 real calls, so it costs a little.
+
+## What I focused on, and why
+
+**Making the evidence trustworthy.** AI can sound confident while quoting things that were never said. So I don't take its word for it: every quote it gives is checked against the real transcript, and anything that doesn't match is thrown out. If that leaves a verdict with nothing to back it up, the verdict is marked "uncertain".
+
+**Telling "definitely wrong" apart from "not sure".** A reviewer's time is limited. Every finding says whether it's a clear error or something worth a second look, so you know where to spend that time.
+
+**Getting the basics working live first.** The core flow is deployed and works properly: run a review, check the evidence, record a decision. It also behaves sensibly when things are loading, empty or broken. Nice-to-haves like uploads or a dashboard waited.
+
+**Actually measuring how good it is.** Saying "the AI seems accurate" isn't enough. I went through all 20 calls myself, wrote down what a correct review should find, and built a test that compares the AI against that.
+
+## Assumptions I made
+
+- The 20 calls provided are all there is. You can't upload your own yet.
+- The AI only makes suggestions. The reviewer always has the final say.
+- Decisions are saved in your browser, not on a server. That fits a single reviewer, and the brief ruled out databases and logins.
+- The app only accepts a call ID, never raw text, so nobody can use it to run their own text through the AI.
+- Where the task pack gives a specific instruction, I followed it over the general rules. For example, the DPA wording, keeping named advice charities, and working out "Friday" from the call date.
 
 ## What I checked
 
-- **Automated tests:** `pnpm verify` passes, including tests for an empty transcript, malformed AI output, made-up quotes, contradicted numbers and dates, timeouts and the decision flow.
-- **Accuracy:** I labelled all 20 calls by hand: 5 accurate summaries and 21 known errors across the other 15. On two runs, `pnpm eval` found **21/21** errors and raised **no false alarms** on the 5 accurate calls. The report in `eval/last-run.md` shows which finding matched each label.
-- **Production:** the Playwright test passes against the live URL. Repeat reviews are served from the cache in under 1 s, the API returns the right error codes, and `vercel logs` shows no errors.
-- **Secrets:** no credentials in the repo or its history; only `.env.example` is committed.
+- **Tests:** all 91 automated tests pass. They cover awkward cases too, like an empty transcript, broken AI output, made-up quotes, wrong numbers and dates, and timeouts.
+- **Accuracy:** I hand-checked all 20 calls. Five summaries are accurate; the other 15 contain 21 real errors between them. The AI caught **all 21**, and didn't wrongly flag any of the five accurate ones. I ran it twice with the same result. The full breakdown is in `eval/last-run.md`.
+- **The live site:** the browser test passes against the real URL, the logs show no errors, and repeat reviews come back in under a second.
+- **Secrets:** no API keys anywhere in the code or its history. Only the empty `.env.example` template is included.
 
-## Known limitations
+## What it doesn't do well yet
 
-- **The labels are mine.** They're one reviewer's reading of the rules. The eval doesn't yet score wrong _extra_ findings on calls that do have errors.
-- **The API is public.** A shared cache and a per-IP rate limit (10 a minute) cap spend at about one model call per call per deploy, but there's no login.
-- **Quote checking is still text matching.** A real quote can be cited for the wrong point.
-- **Simple rule checks.** The plain-code checks are regexes and sentence splitting is a heuristic. Names and company names are left to the AI.
-- **One browser only.** Decisions don't move between browsers or reviewers.
+- **The answer key is mine.** It's one person's reading of the rules, and someone else might disagree on a call or two. I also haven't yet measured whether the AI raises extra, unnecessary points on calls that do have real errors.
+- **No login.** Anyone with the link can use it. Costs are kept in check because results are cached and there's a limit of 10 reviews a minute per person.
+- **The AI can quote the right line for the wrong reason.** The quote checking confirms the words are really there, but not that they prove the point.
+- **The simple checks are simple.** Spotting things like American spellings or stated amounts uses basic pattern matching. Anything subtler, like a company name that should have been hidden, is left to the AI.
+- **Decisions stay in one browser.** They don't follow you to another computer or another reviewer.
 
-## What I'd tackle next
+## What I'd do next
 
-1. List the AI's extra findings on calls with errors, and have a second reviewer check my labels.
-2. Let reviewers paste in a new transcript–summary pair, run through the same checks.
-3. Export decisions, and store them on a server once there's a login.
-4. Highlight each claim inside the summary text, linked both ways to its findings.
+1. Ask a second reviewer to check my answer key, and start tracking unnecessary findings too.
+2. Let reviewers paste in their own call and summary.
+3. Let decisions be exported, and save them properly once there's a login.
+4. Highlight each claim right inside the summary text, so it's easier to see what's being judged.
 
-More detail on the reasoning, and on where the AI got things wrong, is in [`DECISIONS.md`](DECISIONS.md).
+For the longer story, including where the AI got things wrong along the way, see [`DECISIONS.md`](DECISIONS.md).
