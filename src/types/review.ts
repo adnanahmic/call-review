@@ -172,6 +172,7 @@ export const ApiErrorCodes = [
   "upstream_error",
   "invalid_model_output",
   "refused",
+  "rate_limited",
 ] as const;
 export type ApiErrorCode = (typeof ApiErrorCodes)[number];
 
