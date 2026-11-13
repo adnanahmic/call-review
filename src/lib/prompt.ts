@@ -36,6 +36,8 @@ What to produce:
 2. omissions: information the rules REQUIRE that was discussed in the transcript but is missing from the summary (e.g. a severe hardship detail, a required phrase such as "customer signposted" or "Consent gained to record vulnerability", a promise to pay amount/date, an I&E refusal, third-party/authority status, a "risk of further action" warning). Cite the transcript turns where it was discussed. Use certainty "definite" only when both the discussion and the requirement are clear.
 3. ruleBreaches: places where the summary breaks a rule even if the underlying fact is correct (e.g. stating an arrears amount, naming a private entity or a person, American spelling, wrong mandated phrasing, "further action" used for next steps). summaryText is the offending verbatim fragment of the summary. Cite transcript turns only if they help. Name the rule in "rule" using the heading from the rules (e.g. "Arrears/Balances", "Privacy (Entity Redaction)", "Consent").
 
+Report each underlying problem once. If a claim is already marked "contradicted" or "unsupported", do not repeat the same problem as an omission or rule breach unless a different rule is also broken. Never list the same rule twice for the same transcript turn.
+
 Return only the JSON object.`;
 
 const WEEKDAYS = [

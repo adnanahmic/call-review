@@ -171,69 +171,58 @@ export function buildReview(
     });
   }
 
-  const issues: ReviewedIssue[] = [];
-
-  for (const o of llm.omissions) {
+  const omissions: ReviewedIssue[] = llm.omissions.map((o) => {
     const checked = checkEvidence(o.evidence, turns);
-    const flags = evidenceFlags(checked);
-    let certainty = o.certainty;
-    if (checked.valid.length === 0) {
-      certainty = "possible";
-      flags.push(
-        "No verifiable transcript evidence that this was discussed, so it is shown as possible only.",
-      );
-    }
-    issues.push({
-      id: `O${issues.length + 1}`,
+    const noEvidence = checked.valid.length === 0;
+    return {
+      id: "",
       kind: "omission",
       source: "ai",
       rule: o.rule.trim(),
       description: o.description.trim(),
-      certainty,
+      certainty: noEvidence ? "possible" : o.certainty,
       evidence: checked.valid,
-      flags,
-    });
-  }
+      flags: [
+        ...evidenceFlags(checked),
+        ...(noEvidence
+          ? [
+              "No verifiable transcript evidence that this was discussed, so it is shown as possible only.",
+            ]
+          : []),
+      ],
+    };
+  });
 
-  for (const b of llm.ruleBreaches) {
+  const breaches: ReviewedIssue[] = llm.ruleBreaches.map((b) => {
     const checked = checkEvidence(b.evidence, turns);
-    const flags = evidenceFlags(checked);
-    let certainty = b.certainty;
     const inSummary = b.summaryText.trim().length > 0;
-    if (inSummary && !summaryContains(call.summary, b.summaryText)) {
-      certainty = "possible";
-      flags.push(
-        "The quoted summary text was not found in the summary, so it is shown as possible only.",
-      );
-    }
-    issues.push({
-      id: `B${issues.length + 1}`,
+    const notFound = inSummary && !summaryContains(call.summary, b.summaryText);
+    return {
+      id: "",
       kind: "rule-breach",
       source: "ai",
       rule: b.rule.trim(),
       description: b.explanation.trim(),
       summaryText: inSummary ? b.summaryText.trim() : undefined,
-      certainty,
+      certainty: notFound ? "possible" : b.certainty,
       evidence: checked.valid,
-      flags,
-    });
-  }
+      flags: [
+        ...evidenceFlags(checked),
+        ...(notFound
+          ? [
+              "The quoted summary text was not found in the summary, so it is shown as possible only.",
+            ]
+          : []),
+      ],
+    };
+  });
 
-  // Merge deterministic checks; where the AI already reported the same rule,
-  // keep one item and note that the automatic check agrees.
-  for (const auto of automaticIssues(call.summary, issues.length)) {
-    const twin = issues.find(
-      (i) =>
-        i.kind === "rule-breach" &&
-        i.rule.toLowerCase() === auto.rule.toLowerCase(),
-    );
-    if (twin) {
-      twin.certainty = "definite";
-      twin.flags.push("Confirmed by an automatic rule check.");
-    } else {
-      issues.push(auto);
-    }
-  }
+  const issues = numberIssues(
+    mergeAutomatic(
+      mergeDuplicateIssues([...omissions, ...breaches]),
+      automaticIssues(call.summary),
+    ),
+  );
 
   return {
     callId: call.id,
@@ -242,6 +231,108 @@ export function buildReview(
     issues,
     overall: assessOverall(claims, issues),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* 4. De-duplicate findings (pure, no mutation)                        */
+/* ------------------------------------------------------------------ */
+
+/** "Arrears / Balances", "arrears/balances" and "Arrears-Balances" are one rule. */
+export function normaliseRule(rule: string): string {
+  return rule
+    .toLowerCase()
+    .replace(/\(.*?\)/g, "")
+    .replace(/[^a-z]/g, "");
+}
+
+function sharesTurn(a: ReviewedIssue, b: ReviewedIssue): boolean {
+  const turns = new Set(a.evidence.map((e) => e.turnId));
+  return b.evidence.some((e) => turns.has(e.turnId));
+}
+
+/** Same rule and the same transcript turn or summary text = same problem. */
+export function isSameProblem(a: ReviewedIssue, b: ReviewedIssue): boolean {
+  if (normaliseRule(a.rule) !== normaliseRule(b.rule)) return false;
+  return (
+    sharesTurn(a, b) || (!!a.summaryText && a.summaryText === b.summaryText)
+  );
+}
+
+function combine(a: ReviewedIssue, b: ReviewedIssue): ReviewedIssue {
+  const evidence = [...a.evidence];
+  for (const e of b.evidence) {
+    if (!evidence.some((x) => x.turnId === e.turnId && x.quote === e.quote))
+      evidence.push(e);
+  }
+  const label = b.kind === "omission" ? "an omission" : "a rule breach";
+  return {
+    ...a,
+    summaryText: a.summaryText ?? b.summaryText,
+    certainty:
+      a.certainty === "definite" || b.certainty === "definite"
+        ? "definite"
+        : "possible",
+    evidence,
+    flags: [
+      ...a.flags,
+      ...b.flags.filter((f) => !a.flags.includes(f)),
+      `Also reported as ${label}: ${b.description}`,
+    ],
+  };
+}
+
+/** Collapse AI findings that describe the same underlying problem. */
+export function mergeDuplicateIssues(issues: ReviewedIssue[]): ReviewedIssue[] {
+  return issues.reduce<ReviewedIssue[]>((acc, issue) => {
+    const i = acc.findIndex((x) => isSameProblem(x, issue));
+    return i === -1
+      ? [...acc, issue]
+      : acc.map((x, j) => (j === i ? combine(x, issue) : x));
+  }, []);
+}
+
+/**
+ * Add deterministic findings; where the AI already reported the same rule as
+ * a breach, keep one item and note that the automatic check agrees.
+ */
+export function mergeAutomatic(
+  ai: ReviewedIssue[],
+  auto: ReviewedIssue[],
+): ReviewedIssue[] {
+  let merged = ai;
+  const extra: ReviewedIssue[] = [];
+  for (const a of auto) {
+    const i = merged.findIndex(
+      (x) =>
+        x.kind === "rule-breach" &&
+        normaliseRule(x.rule) === normaliseRule(a.rule),
+    );
+    if (i === -1) {
+      extra.push(a);
+    } else {
+      merged = merged.map((x, j) =>
+        j === i
+          ? {
+              ...x,
+              certainty: "definite",
+              flags: [...x.flags, "Confirmed by an automatic rule check."],
+            }
+          : x,
+      );
+    }
+  }
+  return [...merged, ...extra];
+}
+
+/** Stable, readable ids: O1.. omissions, B1.. AI breaches, A1.. automatic. */
+function numberIssues(issues: ReviewedIssue[]): ReviewedIssue[] {
+  const counters = { O: 0, B: 0, A: 0 };
+  return issues.map((i) => {
+    const p =
+      i.source === "automatic" ? "A" : i.kind === "omission" ? "O" : "B";
+    counters[p] += 1;
+    return { ...i, id: `${p}${counters[p]}` };
+  });
 }
 
 /**

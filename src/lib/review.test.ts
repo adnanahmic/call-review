@@ -5,8 +5,12 @@ import {
   syntheticLlmReview,
 } from "@/data/fixtures/synthetic";
 import type { Call } from "@/types/review";
+import type { ReviewedIssue } from "@/types/review";
 import {
   buildReview,
+  isSameProblem,
+  mergeDuplicateIssues,
+  normaliseRule,
   checkEvidence,
   parseLlmReview,
   resolveTurnId,
@@ -226,5 +230,69 @@ describe("reviewEmptyTranscript", () => {
       summary: "Incomplete call.",
     });
     expect(r.issues).toHaveLength(0);
+  });
+});
+
+describe("duplicate findings", () => {
+  const issue = (over: Partial<ReviewedIssue>): ReviewedIssue => ({
+    id: "",
+    kind: "rule-breach",
+    source: "ai",
+    rule: "Consent",
+    description: "d",
+    certainty: "possible",
+    evidence: [{ turnId: "T10", quote: "q" }],
+    flags: [],
+    ...over,
+  });
+
+  it("normalises rule names", () => {
+    expect(normaliseRule("Arrears / Balances")).toBe(
+      normaliseRule("arrears/balances"),
+    );
+    expect(normaliseRule("Consent (vulnerability)")).toBe("consent");
+  });
+
+  it("merges the same rule on the same turn into one finding (the CALL-003 case)", () => {
+    const merged = mergeDuplicateIssues([
+      issue({ kind: "omission", description: "Consent phrase misused" }),
+      issue({ certainty: "definite", description: "Consent was refused" }),
+      issue({
+        description: "Health info recorded",
+        evidence: [
+          { turnId: "T10", quote: "q" },
+          { turnId: "T11", quote: "r" },
+        ],
+      }),
+    ]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].certainty).toBe("definite");
+    expect(merged[0].evidence.map((e) => e.turnId)).toEqual(["T10", "T11"]);
+    expect(
+      merged[0].flags.filter((f) => f.startsWith("Also reported")),
+    ).toHaveLength(2);
+  });
+
+  it("keeps different rules, or the same rule on unrelated turns, separate", () => {
+    expect(isSameProblem(issue({}), issue({ rule: "Privacy" }))).toBe(false);
+    expect(
+      isSameProblem(
+        issue({}),
+        issue({ evidence: [{ turnId: "T02", quote: "x" }] }),
+      ),
+    ).toBe(false);
+    expect(
+      isSameProblem(
+        issue({ evidence: [], summaryText: "named Acme" }),
+        issue({ evidence: [], summaryText: "named Acme" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not mutate its input", () => {
+    const input = [issue({}), issue({ certainty: "definite" })];
+    const snapshot = JSON.stringify(input);
+    mergeDuplicateIssues(input);
+    expect(JSON.stringify(input)).toBe(snapshot);
   });
 });
