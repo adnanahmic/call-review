@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Call Summary QA Review
 
-## Getting Started
+**Live:** https://call-review-gold.vercel.app
 
-First, run the development server:
+A small tool that helps a QA reviewer decide whether a collections-call summary accurately reflects its transcript.
+The AI splits each summary into claims and marks each one supported, contradicted, unsupported or uncertain, citing transcript turn IDs that are checked against the real transcript. It also flags required omissions and breaches of the summary rules.
+The reviewer then follows the evidence links and records a decision (accurate / needs correction / escalate).
+
+All 20 calls are synthetic (supplied in `instructions/`). See [`DECISIONS.md`](DECISIONS.md) for the reasoning, trade-offs and known limitations.
+
+## Setup
+
+Requires Node 22 and pnpm 9+.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local   # then set ANTHROPIC_API_KEY
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Variable            | Required | Default             |
+| ------------------- | -------- | ------------------- |
+| `ANTHROPIC_API_KEY` | yes (AI) | none                |
+| `ANTHROPIC_MODEL`   | no       | `claude-sonnet-5-5` |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Without a key, the app still runs: automatic rule checks work and the AI panel shows a clear "not configured" error.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Run
 
-## Learn More
+```bash
+pnpm dev        # http://localhost:3000
+pnpm build && pnpm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Test
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm test       # unit + component tests (Vitest; every LLM call is mocked)
+pnpm test:e2e   # Playwright happy path (starts `pnpm dev`; makes ONE real AI call)
+E2E_BASE_URL=https://call-review-gold.vercel.app pnpm test:e2e   # against prod
+pnpm verify     # format:check, lint, typecheck, test, build (run before every push)
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deploy
 
-## Deploy on Vercel
+```bash
+vercel link --yes
+vercel env add ANTHROPIC_API_KEY production
+vercel --prod
+vercel logs <deployment-url>   # look for "[review]" lines
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Layout
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/app/            page (server) + /api/review route (server-only LLM call)
+src/components/     thin client components (workspace, transcript, findings, decision form)
+src/lib/            pure, tested logic: transcript parsing, rule checks, evidence validation, prompt
+src/types/          shared types + Zod schemas for every boundary
+src/data/           supplied synthetic dataset; fixtures/ holds synthetic test data
+```
