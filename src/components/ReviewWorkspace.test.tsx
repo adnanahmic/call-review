@@ -1,12 +1,16 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { syntheticCall, syntheticLlmReview } from "@/data/fixtures/synthetic";
 import { toCallView } from "@/lib/callView";
 import { STORAGE_KEY } from "@/lib/decisions";
 import { buildReview } from "@/lib/review";
 import type { ReviewResponse } from "@/types/review";
+import { fetchReview } from "@/lib/reviewClient";
 import { ReviewWorkspace } from "./ReviewWorkspace";
+
+vi.mock("@/lib/reviewClient", () => ({ fetchReview: vi.fn() }));
+const reviewFn = vi.mocked(fetchReview);
 
 const view = toCallView(syntheticCall);
 const okResponse: ReviewResponse = {
@@ -15,9 +19,12 @@ const okResponse: ReviewResponse = {
 };
 
 describe("ReviewWorkspace", () => {
+  beforeEach(() => {
+    reviewFn.mockReset();
+  });
+
   it("renders the transcript–summary pair and automatic checks before any AI call", () => {
-    const reviewFn = vi.fn();
-    render(<ReviewWorkspace calls={[view]} reviewFn={reviewFn} />);
+    render(<ReviewWorkspace calls={[view]} />);
     expect(
       screen.getByRole("heading", { name: "SYN-001" }),
     ).toBeInTheDocument();
@@ -36,10 +43,10 @@ describe("ReviewWorkspace", () => {
   it("runs the AI review and shows verdicts with text labels and evidence", async () => {
     const user = userEvent.setup();
     let resolve: (r: ReviewResponse) => void = () => {};
-    const reviewFn = vi.fn(
+    reviewFn.mockImplementation(
       () => new Promise<ReviewResponse>((r) => (resolve = r)),
     );
-    render(<ReviewWorkspace calls={[view]} reviewFn={reviewFn} />);
+    render(<ReviewWorkspace calls={[view]} />);
 
     await user.click(screen.getByRole("button", { name: "Run AI review" }));
     expect(screen.getByText(/Reviewing the summary/)).toBeInTheDocument();
@@ -64,14 +71,13 @@ describe("ReviewWorkspace", () => {
 
   it("shows an error state with retry when the review fails", async () => {
     const user = userEvent.setup();
-    const reviewFn = vi
-      .fn<(id: string) => Promise<ReviewResponse>>()
+    reviewFn
       .mockResolvedValueOnce({
         ok: false,
         error: { code: "timeout", message: "The AI review timed out." },
       })
       .mockResolvedValueOnce(okResponse);
-    render(<ReviewWorkspace calls={[view]} reviewFn={reviewFn} />);
+    render(<ReviewWorkspace calls={[view]} />);
 
     await user.click(screen.getByRole("button", { name: "Run AI review" }));
     const alert = await screen.findByRole("alert");
@@ -83,7 +89,7 @@ describe("ReviewWorkspace", () => {
 
   it("records the reviewer's decision and persists it", async () => {
     const user = userEvent.setup();
-    render(<ReviewWorkspace calls={[view]} reviewFn={vi.fn()} />);
+    render(<ReviewWorkspace calls={[view]} />);
 
     await user.click(screen.getByRole("button", { name: "Save decision" }));
     expect(screen.getByRole("alert")).toHaveTextContent(/Choose a decision/);
@@ -110,8 +116,24 @@ describe("ReviewWorkspace", () => {
     });
   });
 
+  it("restores saved decisions after a reload", async () => {
+    const user = userEvent.setup();
+    const first = render(<ReviewWorkspace calls={[view]} />);
+    await user.click(screen.getByRole("radio", { name: "Summary accurate" }));
+    await user.click(screen.getByRole("button", { name: "Save decision" }));
+    first.unmount();
+
+    render(<ReviewWorkspace calls={[view]} />);
+    expect(screen.getByRole("navigation", { name: "Calls" })).toHaveTextContent(
+      "Summary accurate",
+    );
+    expect(
+      screen.getByRole("radio", { name: "Summary accurate" }),
+    ).toBeChecked();
+  });
+
   it("shows an empty state when there are no calls", () => {
-    render(<ReviewWorkspace calls={[]} reviewFn={vi.fn()} />);
+    render(<ReviewWorkspace calls={[]} />);
     expect(screen.getByText(/No calls to review/)).toBeInTheDocument();
   });
 });
