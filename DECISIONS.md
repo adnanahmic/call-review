@@ -1,56 +1,51 @@
 # Decisions
 
-## What we built and why
+## The idea
 
-A QA reviewer needs to know if a call summary matches its transcript and follows the summary rules. So the app breaks each summary into claims and checks each one against the transcript. Every finding points to the turn it came from, and the reviewer makes the final call.
+A reviewer needs to know whether a summary matches its call. The app splits the summary into claims, checks each against the transcript, and links every finding to the line it's based on. The reviewer makes the final call.
 
 ## Assumptions
 
-- The 20 supplied calls are the whole dataset. You can't upload your own pairs yet.
-- Decisions are saved in the reviewer's browser. CLAUDE.md rules out a database or login, and one reviewer doesn't need either.
-- The AI review only runs when the reviewer clicks the button. That way we don't pay for calls nobody opens.
-- The API only accepts a call ID. The transcript and summary always come from the server, so nobody can send it their own text.
+- The 20 supplied calls are the whole dataset.
+- Decisions are saved in the browser, because the brief ruled out a database and logins.
+- The AI only runs when you click, so you don't pay for calls nobody opens.
+- The API takes only a call ID, so nobody can send it their own text.
 
-## What mattered most
+## Key decisions
 
-**Don't trust the AI's citations.** The model often sounds right even when its quote isn't real. So the code checks every quote against the actual transcript turn and throws out any that don't match. If a "supported" or "contradicted" verdict loses all its evidence this way, it gets downgraded to "uncertain". Any summary sentence the AI skipped shows up as "not assessed", so nothing gets missed silently.
+- **Don't trust AI quotes.** Every quote is checked against the real transcript, and fake ones are dropped. A verdict left with no proof becomes "uncertain". Any sentence the AI skipped is shown as "not assessed".
+- **Some checks don't need AI.** Plain code catches stated amounts, banned phrases, US spellings and phone numbers. These checks still work when the AI fails.
+- **Ignore hold-music noise.** Rule 8 says to ignore garbled text recorded during holds. Those lines are greyed out, and the AI is told to skip them.
+- **Cap the cost.** Results are cached for everyone, and there's a limit of 10 reviews a minute per person.
+- **README over CLAUDE.md.** The task asked for more in the README than CLAUDE.md did, so I followed the task.
 
-**Some checks don't need AI.** Plain code checks for stated arrears amounts, "N/A", American spellings, the word "further action", sentence count and phone numbers. These always show, even when the AI call fails.
+## How the UI helps
 
-**Hold-music noise is ignored.** Rule 8 says to ignore garbled text recorded during holds. Those turns are greyed out and labelled, and the AI is told not to use them.
+- The summary and findings are on the left, the transcript on the right, with problems listed first.
+- Click a turn number to jump to that line.
+- Every verdict has an icon and a word, never just a colour.
+- "Definite" and "possible" are kept apart.
+- If the AI fails, you can still review the call by hand.
 
-## How the UI helps the reviewer
+## How AI was used
 
-The summary and findings sit on the left, the transcript on the right. Problems come first. Click a turn ID and the transcript jumps to that line and highlights it. "Definite" and "possible" are kept apart, and any warning is spelled out in plain words. Every verdict has an icon and a label, never just a colour. Loading, empty and error states are all handled, and if the AI fails you can still review the call by hand.
+- **In the app:** one Claude call per review (Sonnet 5.5 by default). It returns JSON, which the code re-checks. A review takes 7–15 seconds.
+- **To check the app:** I wrote my own answer key for all 20 calls. The AI found all 21 known errors and flagged nothing wrong on the 5 accurate summaries, in two runs out of two.
+- **To build it:** Claude Code wrote the app. It hit a few snags, such as a broken Next.js type and a wrong Vercel setting, and each is fixed in its own commit.
 
-## How AI was used, and where it got things wrong
+## Where the AI got things wrong
 
-The app makes one server-side call to Claude per review: Sonnet 5.5 by default, via `ANTHROPIC_MODEL`. It asks for JSON and still re-checks that JSON with Zod. A review takes about 7–15 seconds.
-
-It does a good job on the obvious errors. On CALL-003 it caught consent being claimed when the customer refused (T10), the left-out "no money for food" (T08), and the arrears amount. On CALL-019 it spotted that the agent made the call, not the customer (T01).
-
-Where it falls short:
-
-- It reported the CALL-003 consent problem three separate times, which inflated the counts. Fixed: the prompt now asks for each problem once, and the code merges findings with the same rule on the same turn.
-- It sometimes cites a nearby turn instead of the best one.
-- On vague claims like "checked understanding", its answer changes between runs.
-
-I used Claude Code to build it. It hit a few setup snags: a Next.js 16 type that broke `tsc`, a Vercel project set up for a static site, and a test that was too loose. Each one is fixed in its own commit.
+- It reported the same problem up to three times. Fixed by asking for each problem once and merging duplicates in code.
+- It sometimes cites a nearby line rather than the best one.
+- On vague claims like "checked understanding", its answer can change between runs.
 
 ## What we cut
 
-Uploading new calls, "review all" or a dashboard, saving decisions on a server, highlighting claims inside the summary, and dark mode.
+Uploading calls, a dashboard, server-side storage, highlighting inside the summary, and dark mode.
 
-## Known limitations
+## Limitations
 
-- The review API is public. Reviews are cached across server instances, and there's a per-IP rate limit (10 a minute), so spend is roughly capped at one model call per call per deploy. There's still no login.
-- Accuracy is measured, but only against my own labels. I hand-checked all 20 calls (`eval/labels.ts`): 5 are accurate and 15 contain 21 known errors. On two runs, `pnpm eval` found all 21 (every one by the AI, not just the automatic checks) and raised no false alarms on the 5 accurate calls. The full report is in `eval/last-run.md`. Three caveats: the labels are one person's reading of the rules; I'd already seen the AI's output for 4 calls before labelling them; and the eval doesn't yet check for wrong extra findings on the calls that do have errors.
-- Quote matching is stricter now (whole words; short quotes that also appear elsewhere are rejected), but it's still text matching, not understanding. A real quote can be cited for the wrong point.
-- Sentence splitting and the regex checks are simple rules and can miss things. Names and company names are left to the AI.
-- Decisions stay in one browser.
-
-## Future work
-
-- Have a second reviewer check the labels, and score wrong extra findings on calls with errors.
-- Let reviewers paste in their own calls.
-- Export decisions.
+- The answer key is my own reading of the rules. I'd also already seen the AI's output for 4 of the calls before labelling them.
+- Extra, unnecessary findings on calls with errors aren't measured yet.
+- A quote can be real but used for the wrong point.
+- There's no login, and decisions stay in one browser.
