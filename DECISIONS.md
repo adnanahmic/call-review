@@ -44,13 +44,13 @@ Uploading new calls, "review all" or a dashboard, saving decisions on a server, 
 ## Known limitations
 
 - The review API is public. Reviews are cached across server instances, and there's a per-IP rate limit (10 a minute), so spend is roughly capped at one model call per call per deploy. There's still no login.
-- Accuracy is only measured on a small sample. I hand-checked 6 of the 20 calls (`eval/labels.ts`). `pnpm eval` found all 7 known errors and raised no false alarms on the 2 clean calls, in two runs out of two. That's encouraging but far too small to trust on its own; the other 14 calls are unlabelled.
+- Accuracy is measured, but only against my own labels. I hand-checked all 20 calls (`eval/labels.ts`): 5 are accurate and 15 contain 21 known errors. On two runs, `pnpm eval` found all 21 (every one by the AI, not just the automatic checks) and raised no false alarms on the 5 accurate calls. The full report is in `eval/last-run.md`. Three caveats: the labels are one person's reading of the rules; I'd already seen the AI's output for 4 calls before labelling them; and the eval doesn't yet check for wrong extra findings on the calls that do have errors.
 - Quote matching is stricter now (whole words; short quotes that also appear elsewhere are rejected), but it's still text matching, not understanding. A real quote can be cited for the wrong point.
 - Sentence splitting and the regex checks are simple rules and can miss things. Names and company names are left to the AI.
 - Decisions stay in one browser.
 
 ## Future work
 
-- Label the remaining 14 calls and tune the prompt against the full set.
+- Have a second reviewer check the labels, and score wrong extra findings on calls with errors.
 - Let reviewers paste in their own calls.
 - Export decisions.

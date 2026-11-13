@@ -25,7 +25,7 @@ cp .env.example .env.local   # add your ANTHROPIC_API_KEY
 pnpm dev          # http://localhost:3000
 pnpm test         # unit + component tests (AI mocked)
 pnpm test:e2e     # one end-to-end run with a real AI call
-pnpm eval         # accuracy on 6 hand-checked calls (real AI calls)
+pnpm eval         # accuracy on all 20 hand-checked calls (20 real AI calls)
 pnpm verify       # everything; run before every push
 
 vercel env add ANTHROPIC_API_KEY production
