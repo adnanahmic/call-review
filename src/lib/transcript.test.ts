@@ -65,6 +65,11 @@ describe("quoteAppearsInTurn", () => {
   it("supports ellipsis-separated fragments", () => {
     expect(quoteAppearsInTurn("I've got... for food", turn)).toBe(true);
   });
+  it("matches whole words only", () => {
+    const t = parseTranscript("T01 [00:00] Customer: I paid yesterday.")[0];
+    expect(quoteAppearsInTurn("yes", t)).toBe(false);
+    expect(quoteAppearsInTurn("paid yesterday", t)).toBe(true);
+  });
   it("rejects fabricated quotes", () => {
     expect(quoteAppearsInTurn("I have plenty of money", turn)).toBe(false);
     expect(quoteAppearsInTurn("", turn)).toBe(false);

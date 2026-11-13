@@ -36,6 +36,34 @@ describe("resolveTurnId / checkEvidence", () => {
     expect(resolveTurnId("T99", turns)).toBeUndefined();
   });
 
+  it("does not resolve a bare call id or other junk to a turn", () => {
+    expect(resolveTurnId("SYN-001", turns)).toBeUndefined();
+    expect(resolveTurnId("CALL-003", turns)).toBeUndefined();
+    expect(resolveTurnId("T5x", turns)).toBeUndefined();
+    expect(resolveTurnId("turn 5", turns)?.id).toBe("T05");
+    expect(resolveTurnId("SYN-001:T05", turns)?.id).toBe("T05");
+  });
+
+  it("discards short quotes that also appear in other turns as ambiguous", () => {
+    const yesTurns = parseTranscript(
+      [
+        "T01 [00:00] Agent: Can you confirm your name?",
+        "T02 [00:05] Customer: Yes, that's right.",
+        "T03 [00:10] Agent: And you want the hold?",
+        "T04 [00:15] Customer: Yes, that's right, please.",
+      ].join("\n"),
+    );
+    const r = checkEvidence(
+      [
+        { turnId: "T04", quote: "that's right" },
+        { turnId: "T04", quote: "that's right, please" },
+      ],
+      yesTurns,
+    );
+    expect(r.ambiguous).toBe(1);
+    expect(r.valid).toEqual([{ turnId: "T04", quote: "that's right, please" }]);
+  });
+
   it("discards citations to missing turns or quotes not in the turn", () => {
     const r = checkEvidence(
       [

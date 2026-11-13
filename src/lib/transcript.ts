@@ -76,13 +76,42 @@ export function normaliseForMatch(s: string): string {
     .trim();
 }
 
-/** Is `quote` (loosely) contained in the text of `turn`? Ellipses split the quote into parts. */
-export function quoteAppearsInTurn(quote: string, turn: Turn): boolean {
-  const haystack = normaliseForMatch(turn.text);
-  const parts = quote
+function parts(quote: string): string[] {
+  return quote
     .split(/\.\.\.|…/)
     .map(normaliseForMatch)
     .filter((p) => p.length > 0);
-  if (parts.length === 0) return false;
-  return parts.every((p) => haystack.includes(p));
+}
+
+/** Whole-word containment: " yes " must not match inside "yesterday". */
+function containsWords(haystack: string, needle: string): boolean {
+  return ` ${haystack} `.includes(` ${needle} `);
+}
+
+/**
+ * Is `quote` contained in the text of `turn`, ignoring case and punctuation?
+ * Matches whole words only; "..." splits the quote into fragments that must
+ * all appear.
+ */
+export function quoteAppearsInTurn(quote: string, turn: Turn): boolean {
+  const ps = parts(quote);
+  if (ps.length === 0) return false;
+  const haystack = normaliseForMatch(turn.text);
+  return ps.every((p) => containsWords(haystack, p));
+}
+
+export const MIN_DISTINCTIVE_WORDS = 3;
+
+/**
+ * A short quote ("Yes", "That's right") that also appears in other turns
+ * proves nothing about which turn the model meant.
+ */
+export function isAmbiguousQuote(
+  quote: string,
+  turn: Turn,
+  turns: Turn[],
+): boolean {
+  const words = parts(quote).join(" ").split(" ").filter(Boolean).length;
+  if (words >= MIN_DISTINCTIVE_WORDS) return false;
+  return turns.some((t) => t.id !== turn.id && quoteAppearsInTurn(quote, t));
 }

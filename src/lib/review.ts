@@ -11,7 +11,11 @@ import {
 } from "@/types/review";
 import { checkSummaryRules } from "./rules";
 import { summaryContains, uncoveredSentences } from "./summary";
-import { parseTranscript, quoteAppearsInTurn } from "./transcript";
+import {
+  isAmbiguousQuote,
+  parseTranscript,
+  quoteAppearsInTurn,
+} from "./transcript";
 
 /* ------------------------------------------------------------------ */
 /* 1. Parse the raw model text                                         */
@@ -47,9 +51,15 @@ export function parseLlmReview(raw: string): ParseResult {
 /* 2. Check every citation against the real transcript                 */
 /* ------------------------------------------------------------------ */
 
-/** Accepts "T05", "T5", "CALL-003 T05", "turn 5" and maps to an existing turn id. */
+/**
+ * Accepts "T05", "T5", "turn 5" and "CALL-003 T05" (or "CALL-003:T05").
+ * Anything else (e.g. a bare "CALL-003") does not resolve.
+ */
 export function resolveTurnId(raw: string, turns: Turn[]): Turn | undefined {
-  const m = /T?\s*0*(\d+)\s*$/i.exec(raw.trim()) ?? /T0*(\d+)/i.exec(raw);
+  const s = raw.trim();
+  const m =
+    /^(?:[A-Z]+-\d+[\s:/-]+)?T\s?0*(\d{1,4})$/i.exec(s) ??
+    /^turn\s+0*(\d{1,4})$/i.exec(s);
   if (!m) return undefined;
   const n = Number(m[1]);
   return turns.find((t) => Number(t.id.slice(1)) === n);
@@ -58,6 +68,7 @@ export function resolveTurnId(raw: string, turns: Turn[]): Turn | undefined {
 interface CheckedEvidence {
   valid: Evidence[];
   rejected: number;
+  ambiguous: number;
   citesArtefact: boolean;
 }
 
@@ -67,6 +78,7 @@ export function checkEvidence(
 ): CheckedEvidence {
   const valid: Evidence[] = [];
   let rejected = 0;
+  let ambiguous = 0;
   let citesArtefact = false;
   for (const e of evidence) {
     const turn = resolveTurnId(e.turnId, turns);
@@ -74,12 +86,16 @@ export function checkEvidence(
       rejected++;
       continue;
     }
+    if (isAmbiguousQuote(e.quote, turn, turns)) {
+      ambiguous++;
+      continue;
+    }
     if (turn.suspectedArtefact) citesArtefact = true;
     if (!valid.some((v) => v.turnId === turn.id && v.quote === e.quote)) {
       valid.push({ turnId: turn.id, quote: e.quote.trim() });
     }
   }
-  return { valid, rejected, citesArtefact };
+  return { valid, rejected, ambiguous, citesArtefact };
 }
 
 function evidenceFlags(c: CheckedEvidence): string[] {
@@ -87,6 +103,11 @@ function evidenceFlags(c: CheckedEvidence): string[] {
   if (c.rejected > 0) {
     flags.push(
       `${c.rejected} cited quote${c.rejected === 1 ? "" : "s"} did not match the transcript and ${c.rejected === 1 ? "was" : "were"} discarded.`,
+    );
+  }
+  if (c.ambiguous > 0) {
+    flags.push(
+      `${c.ambiguous} cited quote${c.ambiguous === 1 ? " was" : "s were"} too short to pin to one turn (the same words appear elsewhere) and ${c.ambiguous === 1 ? "was" : "were"} discarded.`,
     );
   }
   if (c.citesArtefact) {
