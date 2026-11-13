@@ -31,7 +31,7 @@ It does a good job on the obvious errors. On CALL-003 it caught consent being cl
 
 Where it falls short:
 
-- It reported the CALL-003 consent problem three separate times, which inflates the counts.
+- It reported the CALL-003 consent problem three separate times, which inflated the counts. Fixed: the prompt now asks for each problem once, and the code merges findings with the same rule on the same turn.
 - It sometimes cites a nearby turn instead of the best one.
 - On vague claims like "checked understanding", its answer changes between runs.
 
@@ -43,15 +43,14 @@ Uploading new calls, "review all" or a dashboard, saving decisions on a server, 
 
 ## Known limitations
 
-- We haven't measured accuracy. No answer key was supplied, so I only spot-checked a few calls.
-- Quote matching is loose. A short quote like "Yes" could match the wrong turn.
+- The review API is public. Reviews are cached across server instances, and there's a per-IP rate limit (10 a minute), so spend is roughly capped at one model call per call per deploy. There's still no login.
+- Accuracy is only measured on a small sample. I hand-checked 6 of the 20 calls (`eval/labels.ts`). `pnpm eval` found all 7 known errors and raised no false alarms on the 2 clean calls, in two runs out of two. That's encouraging but far too small to trust on its own; the other 14 calls are unlabelled.
+- Quote matching is stricter now (whole words; short quotes that also appear elsewhere are rejected), but it's still text matching, not understanding. A real quote can be cited for the wrong point.
 - Sentence splitting and the regex checks are simple rules and can miss things. Names and company names are left to the AI.
 - Decisions stay in one browser.
 
 ## Future work
 
-- Turn these 20 calls into a labelled test set and tune the prompt against it.
-- Merge AI findings that describe the same problem.
+- Label the remaining 14 calls and tune the prompt against the full set.
 - Let reviewers paste in their own calls.
 - Export decisions.
-- Require longer quotes before accepting a "supported" verdict.
