@@ -28,8 +28,8 @@ const US_SPELLINGS: Array<[RegExp, string]> = [
   [/\bprograms?\b/i, "programme"],
   [/\bbehaviors?\b/i, "behaviour"],
   [/\bfavor(s|ed|able)?\b/i, "favour"],
-  [/\bcanceled|canceling\b/i, "cancelled / cancelling"],
-  [/\bcounseling|counselor\b/i, "counselling / counsellor"],
+  [/\b(canceled|canceling)\b/i, "cancelled / cancelling"],
+  [/\b(counseling|counselors?)\b/i, "counselling / counsellor"],
   [/\bdefense\b/i, "defence"],
 ];
 

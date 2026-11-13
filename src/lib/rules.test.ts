@@ -61,6 +61,19 @@ describe("checkSummaryRules", () => {
     expect(f[0].description).toMatch(/authorise/);
   });
 
+  it("matches American spellings only as whole words", () => {
+    const lang = (s: string) =>
+      checkSummaryRules(s).filter((f) => f.rule === "Language").length;
+    expect(lang("DPA completed. The Direct Debit was canceled.")).toBe(1);
+    expect(lang("DPA completed. The customer is seeing counselors.")).toBe(1);
+    // UK spellings and longer words must not trigger (old alternation bug).
+    expect(lang("DPA completed. The Direct Debit was cancelled.")).toBe(0);
+    expect(lang("DPA completed. Precanceling the plan was discussed.")).toBe(0);
+    expect(lang("DPA completed. Counselingly worded advice was given.")).toBe(
+      0,
+    );
+  });
+
   it("flags bullet points and sentence count", () => {
     expect(rulesHit("- DPA completed.\n- Arrears discussed.")).toContain(
       "Tone & Format",
