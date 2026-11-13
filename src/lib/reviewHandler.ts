@@ -8,7 +8,7 @@ import {
 import { clientKey, type RateLimiter } from "./rateLimit";
 import { ReviewError } from "./runReview";
 
-export const STATUS: Record<ApiErrorCode, number> = {
+const STATUS: Record<ApiErrorCode, number> = {
   bad_request: 400,
   not_found: 404,
   refused: 422,

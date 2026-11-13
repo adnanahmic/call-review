@@ -51,7 +51,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
   }
   const sentences = splitSentences(text);
 
-  // Arrears / balance values must never be stated.
   const arrearsAmount =
     /\b(arrears|balance|outstanding)\b[^.;]{0,40}£\s?\d|£\s?\d[\d,.]*[^.;]{0,25}\b(arrears|balance)\b/i;
   if (arrearsAmount.test(text)) {
@@ -64,7 +63,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Payments taken during the call must not include the amount.
   const paymentAmount =
     /£\s?\d[\d,.]*\s+(payment\s+)?(was\s+)?(made|taken|paid)\b(?![^.]*\b(on|by|next|from)\b)|payment of £\s?\d[\d,.]*\s+(was\s+)?(made|taken)/i;
   if (paymentAmount.test(text)) {
@@ -77,7 +75,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Omission rule: never write "not discussed", "N/A", "not completed".
   const placeholder = /\b(not discussed|n\/a|not completed|not applicable)\b/i;
   if (placeholder.test(text)) {
     findings.push({
@@ -89,7 +86,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Terminology: "further action" only inside "risk of further action".
   const furtherAction = /further action/gi;
   const riskOf = /risk of further action/gi;
   const bareFurtherAction =
@@ -105,7 +101,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Format: no bullet points.
   if (/^\s*([-*•]|\d+[.)])\s+/m.test(summary)) {
     findings.push({
       rule: "Tone & Format",
@@ -116,7 +111,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Format: 2–5 sentences (Step 1 short outputs excepted).
   if (
     !SHORT_FORM_OUTPUTS.test(text) &&
     (sentences.length < 2 || sentences.length > 5)
@@ -129,7 +123,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Anonymity: telephone numbers.
   const phone = /(\+44\s?\d|\b0\d{2,4}[\s-]?\d{3,4}[\s-]?\d{3,4}\b)/;
   if (phone.test(text)) {
     findings.push({
@@ -140,7 +133,6 @@ export function checkSummaryRules(summary: string): AutomaticFinding[] {
     });
   }
 
-  // Language: British English.
   for (const [re, uk] of US_SPELLINGS) {
     const m = re.exec(text);
     if (m) {

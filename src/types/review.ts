@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-/* ------------------------------------------------------------------ */
-/* Dataset (input boundary)                                            */
-/* ------------------------------------------------------------------ */
+// Dataset (input boundary)
 
 export const CallSchema = z.object({
   id: z.string().min(1),
@@ -26,10 +24,8 @@ export interface Turn {
   suspectedArtefact: boolean;
 }
 
-/* ------------------------------------------------------------------ */
-/* LLM output (untrusted). Kept free of refinements so it can also be  */
-/* sent to the API as a structured-output JSON schema.                 */
-/* ------------------------------------------------------------------ */
+// LLM output (untrusted). Kept free of refinements so it can also be sent
+// to the API as a structured-output JSON schema.
 
 export const VERDICTS = [
   "supported",
@@ -76,9 +72,7 @@ export const LlmReviewSchema = z.object({
 });
 export type LlmReview = z.infer<typeof LlmReviewSchema>;
 
-/* ------------------------------------------------------------------ */
-/* Validated review (what the UI renders)                              */
-/* ------------------------------------------------------------------ */
+// Validated review (what the UI renders)
 
 export interface Evidence {
   turnId: string;
@@ -121,9 +115,7 @@ export interface ReviewResult {
   overall: { status: OverallStatus; reasons: string[] };
 }
 
-/* ------------------------------------------------------------------ */
-/* API boundary                                                        */
-/* ------------------------------------------------------------------ */
+// API boundary
 
 export const ReviewRequestSchema = z.object({
   callId: z.string().min(1).max(64),
@@ -185,9 +177,7 @@ export const ReviewResponseSchema = z.discriminatedUnion("ok", [
 ]);
 export type ReviewResponse = z.infer<typeof ReviewResponseSchema>;
 
-/* ------------------------------------------------------------------ */
-/* Reviewer decision (stored in the browser only)                      */
-/* ------------------------------------------------------------------ */
+// Reviewer decision (stored in the browser only)
 
 export const DECISIONS = ["accurate", "needs-correction", "escalate"] as const;
 export type DecisionValue = (typeof DECISIONS)[number];
@@ -200,9 +190,7 @@ export const ReviewerDecisionSchema = z.object({
 });
 export type ReviewerDecision = z.infer<typeof ReviewerDecisionSchema>;
 
-/* ------------------------------------------------------------------ */
-/* What the server page hands to the client workspace                  */
-/* ------------------------------------------------------------------ */
+// What the server page hands to the client workspace
 
 export interface CallView {
   id: string;

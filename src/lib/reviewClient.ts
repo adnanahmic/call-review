@@ -1,6 +1,6 @@
 import { ReviewResponseSchema, type ReviewResponse } from "@/types/review";
 
-export const CLIENT_TIMEOUT_MS = 120_000;
+const CLIENT_TIMEOUT_MS = 120_000;
 
 /**
  * Call the review API and validate the response shape. Never throws:

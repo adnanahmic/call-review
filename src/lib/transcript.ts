@@ -100,7 +100,7 @@ export function quoteAppearsInTurn(quote: string, turn: Turn): boolean {
   return ps.every((p) => containsWords(haystack, p));
 }
 
-export const MIN_DISTINCTIVE_WORDS = 3;
+const MIN_DISTINCTIVE_WORDS = 3;
 
 /**
  * A short quote ("Yes", "That's right") that also appears in other turns

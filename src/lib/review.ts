@@ -17,9 +17,7 @@ import {
   quoteAppearsInTurn,
 } from "./transcript";
 
-/* ------------------------------------------------------------------ */
-/* 1. Parse the raw model text                                         */
-/* ------------------------------------------------------------------ */
+// Parse the raw model text
 
 export type ParseResult =
   { ok: true; data: LlmReview } | { ok: false; error: string };
@@ -47,9 +45,7 @@ export function parseLlmReview(raw: string): ParseResult {
   return { ok: true, data: parsed.data };
 }
 
-/* ------------------------------------------------------------------ */
-/* 2. Check every citation against the real transcript                 */
-/* ------------------------------------------------------------------ */
+// Check every citation against the real transcript
 
 /**
  * Accepts "T05", "T5", "turn 5" and "CALL-003 T05" (or "CALL-003:T05").
@@ -118,9 +114,7 @@ function evidenceFlags(c: CheckedEvidence): string[] {
   return flags;
 }
 
-/* ------------------------------------------------------------------ */
-/* 3. Build the validated review                                       */
-/* ------------------------------------------------------------------ */
+// Build the validated review
 
 const NEEDS_EVIDENCE: Verdict[] = ["supported", "contradicted"];
 
@@ -233,9 +227,7 @@ export function buildReview(
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* 4. De-duplicate findings (pure, no mutation)                        */
-/* ------------------------------------------------------------------ */
+// De-duplicate findings (pure, no mutation)
 
 /** "Arrears / Balances", "arrears/balances" and "Arrears-Balances" are one rule. */
 export function normaliseRule(rule: string): string {
@@ -375,9 +367,9 @@ export function reviewEmptyTranscript(call: Call): ReviewResult {
   };
 }
 
-export function automaticIssues(summary: string, offset = 0): ReviewedIssue[] {
+export function automaticIssues(summary: string): ReviewedIssue[] {
   return checkSummaryRules(summary).map((f, i) => ({
-    id: `A${offset + i + 1}`,
+    id: `A${i + 1}`,
     kind: "rule-breach" as const,
     source: "automatic" as const,
     rule: f.rule,

@@ -1,10 +1,10 @@
 import type { ReviewResult } from "@/types/review";
 
 /**
- * Hand-checked labels for all 20 supplied calls. Each was made by reading the
- * transcript against the summary rules before looking at any AI output for
- * that call. Turn ids are the evidence. These are one reviewer's judgement,
- * not an official answer key.
+ * Hand-checked labels for all 20 supplied calls, made by reading each
+ * transcript against the summary rules (16 of them before seeing any AI
+ * output for that call). Turn ids are the evidence. These are one
+ * reviewer's judgement, not an official answer key.
  *
  * A known error counts as found if the AI reports it in any reasonable form:
  * as a contradicted/unsupported claim on the right summary text, or as an
@@ -92,14 +92,14 @@ export function falseAlarms(r: ReviewResult): string[] {
 }
 
 export const LABELS: Label[] = [
-  // ---------------------------------------------------------------- clean
+  // Accurate summaries
   { callId: "CALL-001", clean: true, mustFind: [] },
   { callId: "CALL-004", clean: true, mustFind: [] },
   { callId: "CALL-005", clean: true, mustFind: [] },
   { callId: "CALL-006", clean: true, mustFind: [] },
   { callId: "CALL-007", clean: true, mustFind: [] },
 
-  // ---------------------------------------------------------- with errors
+  // Summaries with known errors
   {
     callId: "CALL-002",
     clean: false,

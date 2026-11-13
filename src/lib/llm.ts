@@ -5,7 +5,7 @@ import { LlmReviewSchema } from "@/types/review";
 import { ReviewError, type ErrorClassifier, type ModelCall } from "./runReview";
 
 export const DEFAULT_MODEL = "claude-sonnet-5-5";
-export const LLM_TIMEOUT_MS = 100_000;
+const LLM_TIMEOUT_MS = 100_000;
 
 export function configuredModel(): string {
   return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
