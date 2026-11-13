@@ -198,3 +198,16 @@ export const ReviewerDecisionSchema = z.object({
   decidedAt: z.string(),
 });
 export type ReviewerDecision = z.infer<typeof ReviewerDecisionSchema>;
+
+/* ------------------------------------------------------------------ */
+/* What the server page hands to the client workspace                  */
+/* ------------------------------------------------------------------ */
+
+export interface CallView {
+  id: string;
+  callDate: string;
+  duration: string;
+  summary: string;
+  turns: Turn[];
+  automaticIssues: ReviewedIssue[];
+}
